@@ -7,7 +7,7 @@ const createWindow = () => {
         width: 600
     })
 
-    
+    window.loadFile('dist/index.html')
 }
 
 app.whenReady().then(async () => {
