@@ -1,7 +1,7 @@
 require('dotenv').config()
 const { MongoClient } = require('mongodb')
 const { connectDB, disconnectDB, addUser, removeUser, getUser, validateUser } = require('../main/database/database')
-const argon2 = require('argon2')
+const argon2 = require('@node-rs/argon2')
 
 describe('Database Functions - Integration Tests', () => {
   let client

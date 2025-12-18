@@ -7,12 +7,13 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-      "build": "webpack",
-      "watch": "webpack --watch",
-      "start": "npm run build && electron-forge start",
-      "test": "jest --detectOpenHandles",
-      "package": "electron-forge package",
-      "make": "electron-forge make"
+    "build": "webpack",
+    "watch": "webpack --watch",
+    "start": "npm run build && electron-forge start",
+    "dev": "concurrently \"npm run watch\" \"npm run start\"",
+    "test": "jest --detectOpenHandles",
+    "package": "electron-forge package",
+    "make": "electron-forge make"
   },
   "devDependencies": {
     "@babel/core": "^7.28.5",
@@ -25,14 +26,23 @@
     "@electron-forge/plugin-auto-unpack-natives": "^7.10.2",
     "@electron-forge/plugin-fuses": "^7.10.2",
     "@electron/fuses": "^1.8.0",
+    "@tailwindcss/postcss": "^4.1.18",
+    "autoprefixer": "^10.4.23",
     "babel-loader": "^10.0.0",
+    "concurrently": "^9.2.1",
+    "css-loader": "^7.1.2",
     "electron": "^39.2.7",
+    "electron-reload": "^2.0.0-alpha.1",
     "html-webpack-plugin": "^5.6.5",
+    "postcss": "^8.5.6",
+    "postcss-loader": "^8.2.0",
+    "style-loader": "^4.0.0",
+    "tailwindcss": "^4.1.18",
     "webpack": "^5.104.0",
     "webpack-cli": "^6.0.1"
   },
   "dependencies": {
-    "argon2": "^0.44.0",
+    "@node-rs/argon2": "^2.0.2",
     "axios": "^1.13.2",
     "dotenv": "^17.2.3",
     "electron-squirrel-startup": "^1.0.1",
@@ -41,6 +51,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongodb": "7.0",
     "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "react-dom": "^19.2.3",
+    "react-router-dom": "^7.11.0"
   }
 }

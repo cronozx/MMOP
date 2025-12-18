@@ -5,9 +5,15 @@ module.exports = {
     mode: 'development',
     entry: './renderer/index.jsx',
     target: 'electron-renderer',
+    devtool: 'source-map',
     output: {
         path: path.resolve(__dirname, 'dist'),
         filename: 'renderer.js'
+    },
+    watchOptions: {
+        ignored: /node_modules/,
+        aggregateTimeout: 300,
+        poll: 1000
     },
     module: {
         rules: [
@@ -20,6 +26,10 @@ module.exports = {
                         presets: ['@babel/preset-react']
                     }
                 }
+            },
+            {
+                test: /\.css$/,
+                use: ['style-loader', 'css-loader', 'postcss-loader']
             }
         ]
     },
