@@ -4,14 +4,14 @@
   "description": "Mod Manager Git",
   "license": "ISC",
   "author": "cronozx",
-  "type": "commonjs",
-  "main": "index.js",
+  "type": "module",
+  "main": "./index.js",
   "scripts": {
     "build": "webpack",
     "watch": "webpack --watch",
     "start": "npm run build && electron-forge start",
     "dev": "concurrently \"npm run watch\" \"npm run start\"",
-    "test": "jest --detectOpenHandles",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --detectOpenHandles",
     "package": "electron-forge package",
     "make": "electron-forge make"
   },
@@ -52,6 +52,7 @@
     "mongodb": "7.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "react-router-dom": "^7.11.0"
+    "react-icons": "^5.5.0",
+    "react-router": "^7.11.0"
   }
 }
