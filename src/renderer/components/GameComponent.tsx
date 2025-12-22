@@ -1,8 +1,25 @@
 import React from "react";
+import { useNavigate } from "react-router";
 
-const GameComponent = ({ image, title, modCount }) => {
+interface GameComponentProps {
+    id: number;
+    image: string;
+    title: string;
+    modCount: number;
+}
+
+const GameComponent: React.FC<GameComponentProps> = ({ id, image, title, modCount }) => {
+    const navigate = useNavigate();
+
+    const handleClick = () => {
+        navigate('/game', { state: { game: { id, title, image, modCount } } });
+    };
+
     return (
-        <div className="group relative rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-2xl aspect-square">
+        <div 
+            onClick={handleClick}
+            className="group relative rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-2xl aspect-square"
+        >
             <img 
                 src={image} 
                 alt={title}

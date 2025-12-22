@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import Layout from '../components/Layout';
 
-const Login = () => {
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
-    const [invalid, setInvalid] = useState(null);
+const Login: React.FC = () => {
+    const [username, setUsername] = useState<string>('');
+    const [password, setPassword] = useState<string>('');
+    const [invalid, setInvalid] = useState<boolean | null>(null);
     const navigate = useNavigate();
 
-    const handleLogin = async (e) => {
+    const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
         if (!username || !password) {
@@ -46,7 +46,7 @@ const Login = () => {
                     onChange={(e) => setPassword(e.target.value)}
                 />
                 <button type="submit" className='px-6 py-3 text-lg font-semibold bg-gray-400 text-white rounded hover:bg-gray-500 cursor-pointer'>Login</button>
-                <button type="button" onClick={(e) => { navigate('/register')}} className='px-6 py-3 text-lg font-semibold bg-gray-400 text-white rounded hover:bg-gray-500 cursor-pointer'>Register</button>
+                <button type="button" onClick={() => { navigate('/register')}} className='px-6 py-3 text-lg font-semibold bg-gray-400 text-white rounded hover:bg-gray-500 cursor-pointer'>Register</button>
                 {invalid && <p className='text-center text-red-600'>Invalid username or password</p>}
             </form>
         </div>

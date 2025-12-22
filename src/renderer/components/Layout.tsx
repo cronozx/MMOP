@@ -3,10 +3,16 @@ import { useNavigate, useLocation } from 'react-router';
 import { BsX } from 'react-icons/bs';
 import { RxHamburgerMenu } from 'react-icons/rx';
 
-const Layout = ({ children, showNavbar = true, showSidebar = true }) => {
-    const [menuToggled, setMenuToggled] = useState(false);
-    const [dropdownToggled, setDropdownToggled] = useState(false);
-    const [username, setUsername] = useState('U')
+interface LayoutProps {
+    children: React.ReactNode;
+    showNavbar?: boolean;
+    showSidebar?: boolean;
+}
+
+const Layout: React.FC<LayoutProps> = ({ children, showNavbar = true, showSidebar = true }) => {
+    const [menuToggled, setMenuToggled] = useState<boolean>(false);
+    const [dropdownToggled, setDropdownToggled] = useState<boolean>(false);
+    const [username, setUsername] = useState<string>('U')
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -92,19 +98,6 @@ const Layout = ({ children, showNavbar = true, showSidebar = true }) => {
                                 }`}
                             >
                                 My Games
-                            </button>
-                            <button 
-                                onClick={() => {
-                                    navigate('/create');
-                                    setMenuToggled(false);
-                                }}
-                                className={`w-full text-left px-4 py-3 rounded-lg transition-colors duration-200 ${
-                                    location.pathname.includes('/create') 
-                                        ? 'bg-purple-600 text-white' 
-                                        : 'text-gray-300 hover:bg-gray-700'
-                                }`}
-                            >
-                                Create
                             </button>
                             <button 
                                 onClick={() => {

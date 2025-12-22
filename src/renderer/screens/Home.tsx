@@ -1,11 +1,24 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import GameComponent from "../components/GameComponent";
 import Layout from "../components/Layout";
+import { GameType } from "../../main/database/database";
 
-const Home = () => {
-    const games = [
-        { id: 1, image: "../public/minecraft.png", title: "Minecraft", modCount: 42 }
-    ]
+const Home: React.FC = () => {
+    const [games, setGames] = useState<GameType[]>([])
+
+    useEffect(() => {
+        const getGames = async () => {
+            const token = await window.db.getAuthToken();
+
+            if (!token) {
+                return;
+            }
+            const fetchedGames = await window.db.getAllGames(token);
+            setGames(fetchedGames);
+        }
+
+        getGames()
+    }, [])
 
     return (
         <Layout>
@@ -20,8 +33,9 @@ const Home = () => {
                         {games.map((game) => (
                             <GameComponent 
                                 key={game.id}
-                                image={game.image} 
-                                title={game.title} 
+                                id={game.id}
+                                image={game.imagePath} 
+                                title={game.name} 
                                 modCount={game.modCount} 
                             />
                         ))}

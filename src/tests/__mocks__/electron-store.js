@@ -11,6 +11,10 @@ class Store {
     this.store.set(key, value);
   }
 
+  has(key) {
+    return this.store.has(key);
+  }
+
   delete(key) {
     this.store.delete(key);
   }

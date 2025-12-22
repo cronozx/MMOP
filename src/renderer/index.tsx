@@ -5,18 +5,18 @@ import Login from './screens/Login';
 import { HashRouter, Navigate, Route, Routes, Outlet } from 'react-router';
 import Register from './screens/Register';
 import Home from './screens/Home';
-import Create from './screens/Create';
+import GameDetail from './screens/GameDetail';
 
-const root = createRoot(document.getElementById('root'));
+const root = createRoot(document.getElementById('root')!);
 
-const PrivateRoute = () => {
-    const [isAuthenticated, setAuthenticated] = useState(null)
+const PrivateRoute: React.FC = () => {
+    const [isAuthenticated, setAuthenticated] = useState<boolean | null>(null)
 
     useEffect(() => {
         const checkAuth = async () => {
             try {
                 const token = await window.db.getAuthToken();
-                const isValid = await window.db.validateAuthToken(token);
+                const isValid = await window.db.validateAuthToken(token || '');
                 setAuthenticated(isValid);
             } catch (error) {
                 setAuthenticated(false);
@@ -40,7 +40,7 @@ root.render(
         <Routes>
             <Route element={ <PrivateRoute/>}>
                 <Route path='/' element={<Home/>} />
-                <Route path='/create' element={<Create/>} />
+                <Route path='/game' element={<GameDetail/>} />
             </Route>
             <Route path='/login' element={<Login />} /> 
             <Route path="/register" element={<Register />} />

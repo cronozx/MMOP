@@ -2,15 +2,15 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import Layout from '../components/Layout';
 
-const Register = () => {
-    const [username, setUsername] = useState('');
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [error, setError] = useState(null);
+const Register: React.FC = () => {
+    const [username, setUsername] = useState<string>('');
+    const [email, setEmail] = useState<string>('');
+    const [password, setPassword] = useState<string>('');
+    const [confirmPassword, setConfirmPassword] = useState<string>('');
+    const [error, setError] = useState<string | null>(null);
     const navigate = useNavigate();
 
-    const handleRegister = async (e) => {
+    const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setError(null);
 
@@ -32,7 +32,7 @@ const Register = () => {
         try {
             await window.db.addUser(username, email, password);
             navigate('/');
-        } catch (err) {
+        } catch (err: any) {
             setError('Registration failed. Username or email may already exist.');
         }
     };
