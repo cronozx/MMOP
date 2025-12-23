@@ -6,6 +6,8 @@ import { HashRouter, Navigate, Route, Routes, Outlet } from 'react-router';
 import Register from './screens/Register';
 import Home from './screens/Home';
 import GameDetail from './screens/GameDetail';
+import Modpacks from './screens/Modpacks';
+import Modpack from './screens/Modpack';
 
 const root = createRoot(document.getElementById('root')!);
 
@@ -41,6 +43,8 @@ root.render(
             <Route element={ <PrivateRoute/>}>
                 <Route path='/' element={<Home/>} />
                 <Route path='/game' element={<GameDetail/>} />
+                <Route path='/modpacks' element={<Modpacks/>} />
+                <Route path='/modpack' element={<Modpack/>} />
             </Route>
             <Route path='/login' element={<Login />} /> 
             <Route path="/register" element={<Register />} />

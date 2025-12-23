@@ -3,7 +3,7 @@ import type { IpcMainInvokeEvent } from 'electron'
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
-import { addUser, connectDB, disconnectDB, validateUser, validateWebToken, getUsernameFromToken, uploadMod, getAllGames } from './src/main/database/database';
+import { addUser, connectDB, disconnectDB, validateUser, validateWebToken, getUsernameFromToken, uploadMod, getAllGames, createModpack, getAllModpacks, updateModpack, getAllModsForGame, getAllUsers } from './src/main/database/database';
 import store from './src/main/utils/store'
 
 const __filename = fileURLToPath(import.meta.url);
@@ -24,6 +24,10 @@ const createIPCHandlers = (): void => {
 
     ipcMain.handle('validateUser', async (_e: IpcMainInvokeEvent, username: string, password: string) => {
         return await validateUser(username, password);
+    });
+
+    ipcMain.handle('getAllUsers', async (_e: IpcMainInvokeEvent, token: string) => {
+        return await getAllUsers(token)
     });
 
     ipcMain.handle('getAuthToken', () => {
@@ -50,9 +54,21 @@ const createIPCHandlers = (): void => {
         return await getAllGames(token);
     });
 
-    ipcMain.handle('getModCount', async (_e: IpcMainInvokeEvent, _id: number) => {
-        return
-    })
+    ipcMain.handle('createModpack', async (_e: IpcMainInvokeEvent, token: string, modpack: any) => {
+        return await createModpack(token, modpack)
+    });
+
+    ipcMain.handle('getAllModpacks', async (_e: IpcMainInvokeEvent, token: string) => {
+        return await getAllModpacks(token);
+    });
+
+    ipcMain.handle('updateModpack', async (_e: IpcMainInvokeEvent, token: string, modpackName: string, updatedModpack: any) => {
+        return await updateModpack(token, modpackName, updatedModpack);
+    });
+
+    ipcMain.handle('getAllModsForGame', async (_e: IpcMainInvokeEvent, token: string, gameId: number) => {
+        return await getAllModsForGame(token, gameId);
+    });
 }
 
 const createWindow = (): void => {

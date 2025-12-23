@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import GameComponent from "../components/GameComponent";
 import Layout from "../components/Layout";
-import { GameType } from "../../main/database/database";
+import { GameType } from "../../types/sharedTypes";
 
 const Home: React.FC = () => {
     const [games, setGames] = useState<GameType[]>([])

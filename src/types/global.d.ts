@@ -3,34 +3,17 @@
 interface DbAPI {
   validateUser: (username: string, password: string) => Promise<boolean>;
   addUser: (username: string, email: string, password: string) => Promise<void>;
+  getAllUsers: (token: string) => Promise<UserData[] | null>;
   getAuthToken: () => Promise<string | undefined>;
   getUsername: () => Promise<string | null>;
   validateAuthToken: (token: string) => Promise<boolean>;
   clearLogin: () => Promise<void>;
   uploadMod: (token: string, mod: ModType) => Promise<void>;
   getAllGames: (token: string) => Promise<Game[]>;
-}
-
-interface ModType {
-  name: string;
-  author: string;
-  game: number;
-  file: {
-    name: string;
-    buffer: number[];
-    size: number;
-    type: string;
-  };
-}
-
-interface Game {
-  id: number;
-  name: string;
-  modCount: number;
-  imagePath: string;
-  acceptedTypes: Record<string, unknown>;
-  extensions: string;
-  description: string;
+  createModpack: (token: string, modpackinfo: ModpackType) => Promise<boolean>;
+  getAllModpacks: (token: string) => Promise<ModpackType[]>;
+  updateModpack: (token: string, modpackName: string, updatedModpack: ModpackType) => Promise<boolean>;
+  getAllModsForGame: (token: string, gameId: number) => Promise<ModType[]>;
 }
 
 declare global {

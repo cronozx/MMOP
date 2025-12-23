@@ -4,51 +4,9 @@ import argon2 from '@node-rs/argon2';
 import jwt from 'jsonwebtoken';
 import store from '../utils/store';
 import { Readable } from 'stream';
+import { GameType, JWTPayload, ModpackType, ModType, UserData } from '../../types/sharedTypes';
 
 dotenv.config();
-
-interface ModType {
-    name: string;
-    author: string;
-    game: number;
-    file: {
-        name: string;
-        buffer: number[];
-        size: number;
-        type: string;
-    };
-}
-
-interface GameType {
-    id: number;
-    name: string;
-    modCount: number;
-    imagePath: string;
-    acceptedTypes: Record<string, unknown>;
-    extensions: string;
-    description: string;
-}
-
-interface ModpackType {
-    name: string,
-    description: string,
-    gameID: number,
-    author: string,
-    contributers: string[],
-    mods: string[]
-}
-
-interface UserData {
-    _id?: any;
-    username: string;
-    email: string;
-    password: string;
-}
-
-interface JWTPayload {
-    userId: any;
-    username: string;
-}
 
 let isConnected = false;
 const client = new MongoClient(process.env.MONGO_URI as string);
@@ -86,6 +44,10 @@ async function addUser(username: string, email: string, password: string): Promi
 
     const logins = await startQuery("logins")
 
+    if (await logins.findOne({ username: username }) || await logins.findOne({ email: email })) {
+        throw new Error('Username or email already exists')
+    }
+
     const passwordHash = await argon2.hash(password)
 
     await logins.insertOne({
@@ -106,7 +68,7 @@ async function removeUser(email: string, password: string): Promise<boolean> {
         email: email
     }) as UserData | null
 
-    if (!userData) {
+    if (!userData || !userData.password) {
         return false
     }
 
@@ -149,20 +111,35 @@ async function getUser(username: string | null = null, email: string | null = nu
     return {_id: userData._id, username: userData.username, email: userData.email, password: userData.password}
 }
 
+async function getAllUsers(token: string): Promise<UserData[] | null> {
+    if (!validateWebToken(token)) {
+        return null;
+    }
+
+    const users = await startQuery('logins');
+    const userData = await users.find().toArray()
+
+    return userData.map(data => ({
+        _id: data._id,
+        username: data.username,
+        email: data.email
+    }))
+} 
+
 async function validateUser(username: string, password: string): Promise<boolean> {
     if (!username || !password) {
         return false
     }
 
-    const user = await getUser(username)
+    const userData = await getUser(username)
     
-    if (!user) {
+    if (!userData || !userData.password) {
         return false
     }
 
-    if (await argon2.verify(user.password, password)) {
+    if (await argon2.verify(userData.password, password)) {
         const token = jwt.sign({ 
-            userId: user._id,
+            userId: userData._id,
             username: username 
         } as JWTPayload, process.env.JWT_SECRET_KEY as string, {
             expiresIn: '1h',
@@ -212,8 +189,83 @@ function getUsernameFromToken(): string | null {
 }
 
 //Modpack functions
+async function createModpack(token: string, modPackInfo: ModpackType): Promise<boolean> {
+    if (!validateWebToken(token)) {
+        return false;
+    }
+
+    return new Promise((resolve, reject) => {
+        try {
+            store.appendToArray('modpacks', modPackInfo)
+            resolve(true)
+        } catch {
+            reject('Failed to create modpack')
+        }
+    })
+}
+
+async function getAllModpacks(token: string): Promise<ModpackType[]> {
+    if (!validateWebToken(token)) {
+        return [];
+    }
+
+    try {
+        const modpacks = store.get('modpacks') as ModpackType[] | undefined;
+        return modpacks || [];
+    } catch (error) {
+        console.error('Failed to retrieve modpacks:', error);
+        return [];
+    }
+}
+
+async function updateModpack(token: string, modpackName: string, updatedModpack: ModpackType): Promise<boolean> {
+    if (!validateWebToken(token)) {
+        return false;
+    }
+
+    try {
+        const modpacks = store.get('modpacks') as ModpackType[] | undefined;
+        if (!modpacks) {
+            return false;
+        }
+
+        const index = modpacks.findIndex(mp => mp.name === modpackName);
+        if (index === -1) {
+            return false;
+        }
+
+        modpacks[index] = updatedModpack;
+        store.set('modpacks', modpacks);
+        return true;
+    } catch (error) {
+        console.error('Failed to update modpack:', error);
+        return false;
+    }
+}
 
 //Mod functions
+async function getAllModsForGame(token: string, gameId: number): Promise<Array<{id: string, name: string, author: string}>> {
+    if (!validateWebToken(token)) {
+        return [];
+    }
+
+    try {
+        const db = client.db('modmngr');
+        const bucket = new GridFSBucket(db, {bucketName: 'mods'});
+        
+        const files = await bucket.find({ 'metadata.game': gameId }).toArray();
+        
+        return files.map(file => ({
+            id: file._id.toString(),
+            name: file.filename,
+            author: file.metadata?.author || 'Unknown'
+        }));
+    } catch (error) {
+        console.error('Error fetching mods:', error);
+        return [];
+    }
+}
+
 function isJarBuffer(buffer: Buffer): boolean {
     if (buffer.length < 2) {
         return false;
@@ -316,5 +368,4 @@ async function getAllGames(token: string): Promise<GameType[]> {
 }
 
 
-export { connectDB, disconnectDB, addUser, getUser, validateUser, removeUser, validateWebToken, getUsernameFromToken, uploadMod, getAllGames };
-export type { GameType };
+export { connectDB, disconnectDB, addUser, getUser, getAllUsers, validateUser, removeUser, validateWebToken, getUsernameFromToken, uploadMod, getAllGames, createModpack, getAllModpacks, updateModpack, getAllModsForGame };

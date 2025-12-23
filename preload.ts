@@ -1,22 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron';
-
-interface ModType {
-  name: string;
-  author: string;
-  game: number;
-  file: {
-    name: string;
-    buffer: number[];
-    size: number;
-    type: string;
-  };
-}
+import { ModType, UserData } from './src/types/sharedTypes';
 
 contextBridge.exposeInMainWorld('db', {
   validateUser: (username: string, password: string): Promise<boolean> => 
     ipcRenderer.invoke('validateUser', username, password),
   addUser: (username: string, email: string, password: string): Promise<void> => 
     ipcRenderer.invoke('addUser', username, email, password),
+  getAllUsers: (token: string): Promise<UserData[] | null> => 
+    ipcRenderer.invoke('getAllUsers', token),
   getAuthToken: (): Promise<string | undefined> => 
     ipcRenderer.invoke('getAuthToken'),
   getUsername: (): Promise<string | null> => 
@@ -28,5 +19,13 @@ contextBridge.exposeInMainWorld('db', {
   uploadMod: (token: string, mod: ModType): Promise<void> => 
     ipcRenderer.invoke('uploadMod', token, mod),
   getAllGames: (token: string): Promise<any[]> => 
-    ipcRenderer.invoke('getAllGames', token)
+    ipcRenderer.invoke('getAllGames', token),
+  createModpack: (token: string, modpackinfo: any): Promise<boolean> =>
+    ipcRenderer.invoke('createModpack', token, modpackinfo),
+  getAllModpacks: (token: string): Promise<any[]> =>
+    ipcRenderer.invoke('getAllModpacks', token),
+  updateModpack: (token: string, modpackName: string, updatedModpack: any): Promise<boolean> =>
+    ipcRenderer.invoke('updateModpack', token, modpackName, updatedModpack),
+  getAllModsForGame: (token: string, gameId: number): Promise<Array<{id: string, name: string, author: string}>> =>
+    ipcRenderer.invoke('getAllModsForGame', token, gameId)
 });

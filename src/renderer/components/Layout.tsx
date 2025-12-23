@@ -101,6 +101,32 @@ const Layout: React.FC<LayoutProps> = ({ children, showNavbar = true, showSideba
                             </button>
                             <button 
                                 onClick={() => {
+                                    navigate('/');
+                                    setMenuToggled(false);
+                                }}
+                                className={`w-full text-left px-4 py-3 rounded-lg transition-colors duration-200 ${
+                                    location.pathname === '/game' 
+                                        ? 'bg-purple-600 text-white' 
+                                        : 'text-gray-300 hover:bg-gray-700'
+                                }`}
+                            >
+                                Create
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    navigate('/modpacks');
+                                    setMenuToggled(false);
+                                }}
+                                className={`w-full text-left px-4 py-3 rounded-lg transition-colors duration-200 ${
+                                    location.pathname === '/modpacks' 
+                                        ? 'bg-purple-600 text-white' 
+                                        : 'text-gray-300 hover:bg-gray-700'
+                                }`}
+                            >
+                                Modpacks
+                            </button>
+                            <button 
+                                onClick={() => {
                                     setMenuToggled(false);
                                 }}
                                 className="w-full text-left px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 transition-colors duration-200"

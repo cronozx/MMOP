@@ -2,46 +2,27 @@ import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router";
 import Layout from "../components/Layout";
 import { useDropzone } from "react-dropzone";
-import { FiPackage, FiUpload, FiX, FiArrowLeft } from "react-icons/fi";
-
-interface GameConfig {
-    id: number;
-    name: string;
-    acceptedTypes: Record<string, string[]>;
-    extensions: string;
-    description: string;
-}
-
-interface ModFile {
-    name: string;
-    size: number;
-    path?: string;
-    type: string;
-}
-
-interface Game {
-    id: number;
-    title: string;
-    image: string;
-    modCount: number;
-}
+import { FiPackage, FiUpload, FiX, FiArrowLeft, FiUser, FiFileText } from "react-icons/fi";
+import { GameType, ModpackType } from "../../types/sharedTypes";
 
 const GameDetail: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
-    const game = location.state?.game as Game | undefined;
+    const game = location.state?.game as GameType | undefined;
 
     const [selectedOption, setSelectedOption] = useState<'modpack' | 'upload' | null>(null);
     const [modpackName, setModpackName] = useState<string>("");
     const [modpackDescription, setModpackDescription] = useState<string>("");
-    const [modpackMods, setModpackMods] = useState<ModFile[]>([]);
-    const [gameConfig, setGameConfig] = useState<GameConfig | null>(null);
+    const [gameConfig, setGameConfig] = useState<GameType | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
+    const [modpacks, setModpacks] = useState<ModpackType[]>([]);
+    const [uploading, setUploading] = useState<boolean>(false);
 
-    const acceptConfig = gameConfig?.acceptedTypes || {};
+    const acceptConfig = gameConfig?.acceptedTypes as Record<string, string[]> || {};
 
     const uploadDropzone = useDropzone({
         onDrop: async (acceptedFiles: File[]) => {
+            setUploading(true);
             console.log("Uploading mod files:", acceptedFiles);
             console.log("For game:", gameConfig?.name);
             
@@ -68,6 +49,8 @@ const GameDetail: React.FC = () => {
                             type: file.type
                         }
                     });
+
+                    setUploading(false);
                     console.log(`Successfully uploaded ${file.name}`);
                 } catch (error) {
                     console.error(`Failed to upload ${file.name}:`, error);
@@ -98,11 +81,18 @@ const GameDetail: React.FC = () => {
                     setGameConfig({
                         id: foundGame.id,
                         name: foundGame.name,
-                        acceptedTypes: foundGame.acceptedTypes as Record<string, string[]> || {},
+                        acceptedTypes: foundGame.acceptedTypes || {},
                         extensions: foundGame.extensions,
-                        description: foundGame.description
+                        description: foundGame.description,
+                        modCount: foundGame.modCount || 0,
+                        imagePath: foundGame.imagePath || ''
                     });
                 }
+
+                // Fetch modpacks for this game
+                const allModpacks = await window.db.getAllModpacks(token);
+                const gameModpacks = allModpacks.filter((mp: ModpackType) => mp.gameID === game.id);
+                setModpacks(gameModpacks);
             } catch (error) {
                 console.error('Error fetching game config:', error);
             } finally {
@@ -150,15 +140,43 @@ const GameDetail: React.FC = () => {
         );
     }
 
-    const handleCreateModpack = (): void => {
-        //Will add modpack handling
+    const handleCreateModpack = async (): Promise<void> => {
+        const token = await window.db.getAuthToken();
+        if (!token) {
+            console.error('No authentication token found');
+            return;
+        }
+
+        const username = await window.db.getUsername();
+        if (!username) {
+            console.error('Could not get username')
+            return;
+        }
+
+        try {
+            const created = await window.db.createModpack(token, {
+                name: modpackName,
+                description: modpackDescription,
+                mods: [],
+                gameID: game.id,
+                author: username,
+                contributers: []
+            })
+
+            if (created) {
+                console.log('Modpack created succesfully')
+            } else {
+                console.log('Modpack not created')
+            }
+        } catch (e) {
+            console.log(`Error creating modpack: ${e}`)
+        }
     };
 
     const resetForm = (): void => {
         setSelectedOption(null);
         setModpackName("");
         setModpackDescription("");
-        setModpackMods([]);
     };
 
     return (
@@ -174,8 +192,8 @@ const GameDetail: React.FC = () => {
                     </button>
 
                     <div className="mb-8">
-                        <h1 className="text-4xl font-bold text-white mb-2">{game.title}</h1>
-                        <p className="text-gray-400">Create content for {game.title}</p>
+                        <h1 className="text-4xl font-bold text-white mb-2">{game.name}</h1>
+                        <p className="text-gray-400">Create content for {game.name}</p>
                         <div className="mt-2 inline-flex items-center px-3 py-1 bg-blue-600/20 rounded-lg">
                             <span className="text-blue-400 text-sm font-medium">
                                 Accepts {gameConfig.extensions} files
@@ -197,7 +215,7 @@ const GameDetail: React.FC = () => {
                                     </div>
                                     <h2 className="text-2xl font-bold text-white mb-3">Create Modpack</h2>
                                     <p className="text-gray-400 leading-relaxed">
-                                        Bundle multiple mods together into a single modpack for {game.title}.
+                                        Bundle multiple mods together into a single modpack for {game.name}.
                                     </p>
                                 </div>
                             </div>
@@ -214,7 +232,7 @@ const GameDetail: React.FC = () => {
                                     </div>
                                     <h2 className="text-2xl font-bold text-white mb-3">Upload Mod</h2>
                                     <p className="text-gray-400 leading-relaxed">
-                                        Upload individual {gameConfig.extensions} mod files to your {game.title} library.
+                                        Upload individual {gameConfig.extensions} mod files to your {game.name} library.
                                     </p>
                                 </div>
                             </div>
@@ -222,7 +240,7 @@ const GameDetail: React.FC = () => {
                     ) : selectedOption === 'modpack' ? (
                         <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-8">
                             <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-2xl font-bold text-white">Create {game.title} Modpack</h2>
+                                <h2 className="text-2xl font-bold text-white">Create {game.name} Modpack</h2>
                                 <button 
                                     onClick={resetForm}
                                     className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-white"
@@ -264,7 +282,7 @@ const GameDetail: React.FC = () => {
                                 <div className="flex justify-end pt-4">
                                     <button
                                         onClick={handleCreateModpack}
-                                        disabled={!modpackName || modpackMods.length === 0}
+                                        disabled={!modpackName}
                                         className="px-6 py-3 bg-linear-to-r from-purple-600 to-purple-500 text-white font-medium rounded-lg hover:from-purple-500 hover:to-purple-400 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-purple-500/50"
                                     >
                                         Create Modpack
@@ -275,7 +293,7 @@ const GameDetail: React.FC = () => {
                     ) : (
                         <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-8">
                             <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-2xl font-bold text-white">Upload {game.title} Mod</h2>
+                                <h2 className="text-2xl font-bold text-white">Upload {game.name} Mod</h2>
                                 <button 
                                     onClick={resetForm}
                                     className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-white"
@@ -299,22 +317,85 @@ const GameDetail: React.FC = () => {
                                             uploadDropzone.isDragActive ? 'text-blue-400' : 'text-gray-500'
                                         }`} />
                                         <h3 className="text-xl font-bold text-white mb-2">
-                                            {uploadDropzone.isDragActive ? "Drop your mod files here" : `Upload Your ${gameConfig.name} Mod`}
+                                            {uploadDropzone.isDragActive ? "Drop your mod files here" : uploading ? 'Uploading your mod...' : `Upload Your ${gameConfig.name} Mod`}
                                         </h3>
                                         <p className="text-gray-400 mb-4">
-                                            Click to browse or drag and drop your mod files
+                                            {uploading ? 'Thank you for choosing MMOP' : 'Click to browse or drag and drop your mod files'}
                                         </p>
-                                        <div className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600/20 rounded-lg">
-                                            <span className="text-blue-400 text-sm font-medium">
-                                                Supports {gameConfig.extensions} files
-                                            </span>
-                                        </div>
+                                        {
+                                            !uploading && <div className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600/20 rounded-lg">
+                                                <span className="text-blue-400 text-sm font-medium">
+                                                    Supports {gameConfig.extensions} files
+                                                </span>
+                                            </div>
+                                        }
                                     </div>
                                 );
                             })()}
                         </div>
                     )}
-                </div>
+                    {/* Modpacks Section */}
+                    <div className="mt-12">
+                        <div className="mb-6">
+                            <h2 className="text-2xl font-bold text-white mb-2">Modpacks for {game.name}</h2>
+                            <p className="text-gray-400">Browse existing modpack collections for this game</p>
+                        </div>
+
+                        {modpacks.length === 0 ? (
+                            <div className="bg-gray-800/30 border border-gray-700 rounded-xl p-12 text-center">
+                                <div className="w-16 h-16 mx-auto mb-4 bg-gray-800/50 rounded-full flex items-center justify-center">
+                                    <FiPackage className="text-gray-600 text-3xl" />
+                                </div>
+                                <p className="text-gray-400 text-lg mb-2">No modpacks yet</p>
+                                <p className="text-gray-500 text-sm">Create the first modpack for {game.name}!</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {modpacks.map((modpack, index) => (
+                                    <div 
+                                        key={index}
+                                        onClick={() => navigate('/modpack', { state: { modpack } })}
+                                        className="group bg-gray-800/50 border border-gray-700 rounded-xl p-6 hover:border-purple-500/50 hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300 cursor-pointer"
+                                    >
+                                        <div className="flex items-start justify-between mb-4">
+                                            <div className="w-12 h-12 bg-purple-600/20 rounded-lg flex items-center justify-center group-hover:bg-purple-600/30 transition-colors">
+                                                <FiPackage className="text-purple-400 text-2xl" />
+                                            </div>
+                                            <div className="flex items-center space-x-2 px-3 py-1 bg-gray-700/50 rounded-lg">
+                                                <FiFileText className="text-gray-400 text-sm" />
+                                                <span className="text-gray-400 text-sm font-medium">
+                                                    {modpack.mods?.length || 0} {modpack.mods?.length === 1 ? 'mod' : 'mods'}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <h3 className="text-xl font-bold text-white mb-2 group-hover:text-purple-400 transition-colors">
+                                            {modpack.name}
+                                        </h3>
+
+                                        {modpack.description && (
+                                            <p className="text-gray-400 text-sm mb-4 line-clamp-2">
+                                                {modpack.description}
+                                            </p>
+                                        )}
+
+                                        <div className="flex items-center space-x-2 pt-4 border-t border-gray-700">
+                                            <FiUser className="text-gray-500 text-sm" />
+                                            <span className="text-gray-500 text-sm">by {modpack.author}</span>
+                                        </div>
+
+                                        {(modpack.contributers?.length || 0) > 0 && (
+                                            <div className="mt-2 flex items-center space-x-2">
+                                                <span className="text-gray-600 text-xs">
+                                                    +{modpack.contributers?.length || 0} {modpack.contributers?.length === 1 ? 'contributor' : 'contributors'}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>                </div>
             </div>
         </Layout>
     );
