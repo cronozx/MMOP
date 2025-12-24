@@ -8,7 +8,7 @@ import { GameType, ModpackType } from "../../types/sharedTypes";
 const GameDetail: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
-    const game = location.state?.game as GameType | undefined;
+    const game = location.state?.game;
 
     const [selectedOption, setSelectedOption] = useState<'modpack' | 'upload' | null>(null);
     const [modpackName, setModpackName] = useState<string>("");
@@ -33,7 +33,8 @@ const GameDetail: React.FC = () => {
                         console.error('No authentication token found');
                         continue;
                     }
-                    const username = await window.db.getUsername() || 'Unknown';
+                    const data = await window.db.getUserDataFromToken() 
+                    const username = data?.username || 'Unknown';
                     
                     const arrayBuffer = await file.arrayBuffer();
                     const buffer = Array.from(new Uint8Array(arrayBuffer));
@@ -147,7 +148,8 @@ const GameDetail: React.FC = () => {
             return;
         }
 
-        const username = await window.db.getUsername();
+        const data = await window.db.getUserDataFromToken() 
+        const username = data?.username;
         if (!username) {
             console.error('Could not get username')
             return;
@@ -192,8 +194,8 @@ const GameDetail: React.FC = () => {
                     </button>
 
                     <div className="mb-8">
-                        <h1 className="text-4xl font-bold text-white mb-2">{game.name}</h1>
-                        <p className="text-gray-400">Create content for {game.name}</p>
+                        <h1 className="text-4xl font-bold text-white mb-2">{game.title}</h1>
+                        <p className="text-gray-400">Create content for {game.title}</p>
                         <div className="mt-2 inline-flex items-center px-3 py-1 bg-blue-600/20 rounded-lg">
                             <span className="text-blue-400 text-sm font-medium">
                                 Accepts {gameConfig.extensions} files
@@ -215,7 +217,7 @@ const GameDetail: React.FC = () => {
                                     </div>
                                     <h2 className="text-2xl font-bold text-white mb-3">Create Modpack</h2>
                                     <p className="text-gray-400 leading-relaxed">
-                                        Bundle multiple mods together into a single modpack for {game.name}.
+                                        Bundle multiple mods together into a single modpack for {game.title}.
                                     </p>
                                 </div>
                             </div>
@@ -232,7 +234,7 @@ const GameDetail: React.FC = () => {
                                     </div>
                                     <h2 className="text-2xl font-bold text-white mb-3">Upload Mod</h2>
                                     <p className="text-gray-400 leading-relaxed">
-                                        Upload individual {gameConfig.extensions} mod files to your {game.name} library.
+                                        Upload individual {gameConfig.extensions} mod files to your {game.title} library.
                                     </p>
                                 </div>
                             </div>
@@ -240,7 +242,7 @@ const GameDetail: React.FC = () => {
                     ) : selectedOption === 'modpack' ? (
                         <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-8">
                             <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-2xl font-bold text-white">Create {game.name} Modpack</h2>
+                                <h2 className="text-2xl font-bold text-white">Create {game.title} Modpack</h2>
                                 <button 
                                     onClick={resetForm}
                                     className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-white"
@@ -293,7 +295,7 @@ const GameDetail: React.FC = () => {
                     ) : (
                         <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-8">
                             <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-2xl font-bold text-white">Upload {game.name} Mod</h2>
+                                <h2 className="text-2xl font-bold text-white">Upload {game.title} Mod</h2>
                                 <button 
                                     onClick={resetForm}
                                     className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-white"
@@ -337,7 +339,7 @@ const GameDetail: React.FC = () => {
                     {/* Modpacks Section */}
                     <div className="mt-12">
                         <div className="mb-6">
-                            <h2 className="text-2xl font-bold text-white mb-2">Modpacks for {game.name}</h2>
+                            <h2 className="text-2xl font-bold text-white mb-2">Modpacks for {game.title}</h2>
                             <p className="text-gray-400">Browse existing modpack collections for this game</p>
                         </div>
 
@@ -347,7 +349,7 @@ const GameDetail: React.FC = () => {
                                     <FiPackage className="text-gray-600 text-3xl" />
                                 </div>
                                 <p className="text-gray-400 text-lg mb-2">No modpacks yet</p>
-                                <p className="text-gray-500 text-sm">Create the first modpack for {game.name}!</p>
+                                <p className="text-gray-500 text-sm">Create the first modpack for {game.title}!</p>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

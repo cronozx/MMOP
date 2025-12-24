@@ -1,11 +1,14 @@
 /// <reference types="node" />
 
+import { ObjectId } from "mongodb";
+import { NotifiactionType } from "./sharedTypes";
+
 interface DbAPI {
   validateUser: (username: string, password: string) => Promise<boolean>;
   addUser: (username: string, email: string, password: string) => Promise<void>;
   getAllUsers: (token: string) => Promise<UserData[] | null>;
   getAuthToken: () => Promise<string | undefined>;
-  getUsername: () => Promise<string | null>;
+  getUserDataFromToken: () => Promise<{username: string, _id: string} | null>;
   validateAuthToken: (token: string) => Promise<boolean>;
   clearLogin: () => Promise<void>;
   uploadMod: (token: string, mod: ModType) => Promise<void>;
@@ -14,6 +17,10 @@ interface DbAPI {
   getAllModpacks: (token: string) => Promise<ModpackType[]>;
   updateModpack: (token: string, modpackName: string, updatedModpack: ModpackType) => Promise<boolean>;
   getAllModsForGame: (token: string, gameId: number) => Promise<ModType[]>;
+  getNotifications: (token: string, _id: string) => Promise<NotifiactionType[]>;
+  sendNotification: (token: string, _id: string, notification: NotifiactionType) => Promise<boolean>;
+  markNotificationsAsRead: (token: string) => Promise<void>;
+  randUUID: () => Promise<string>;
 }
 
 declare global {

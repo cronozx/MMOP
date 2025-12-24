@@ -1,5 +1,13 @@
+export interface NotifiactionType {
+  id: string,
+  type: string;
+  title: string;
+  message: string;
+  unread: boolean;
+}
+
 export interface ModType {
-  id?: string;
+  _id?: string;
   name: string;
   author: string;
   game: number;
@@ -22,6 +30,7 @@ export interface GameType {
 }
 
 export interface ModpackType {
+  _id: string;
   name: string;
   description: string;
   gameID: number;
@@ -31,10 +40,11 @@ export interface ModpackType {
 }
 
 export interface UserData {
-  _id?: any;
+  _id?: string;
   username: string;
   email: string;
   password?: string;
+  notifications: NotifiactionType[];
 }
 
 export interface JWTPayload {

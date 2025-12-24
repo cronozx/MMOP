@@ -1,10 +1,10 @@
 import dotenv from 'dotenv';
-import { MongoClient, GridFSBucket, Collection, Db } from 'mongodb';
+import { MongoClient, GridFSBucket, Collection, Db, ObjectId } from 'mongodb';
 import argon2 from '@node-rs/argon2';
 import jwt from 'jsonwebtoken';
 import store from '../utils/store';
 import { Readable } from 'stream';
-import { GameType, JWTPayload, ModpackType, ModType, UserData } from '../../types/sharedTypes';
+import { GameType, JWTPayload, ModpackType, ModType, NotifiactionType, UserData } from '../../types/sharedTypes';
 
 dotenv.config();
 
@@ -54,6 +54,7 @@ async function addUser(username: string, email: string, password: string): Promi
         username: username, 
         email: email,
         password: passwordHash,
+        notifications: []
     })
 }
 
@@ -108,7 +109,7 @@ async function getUser(username: string | null = null, email: string | null = nu
         return null
     }
 
-    return {_id: userData._id, username: userData.username, email: userData.email, password: userData.password}
+    return {_id: userData._id, username: userData.username, email: userData.email, password: userData.password, notifications: userData.notifications}
 }
 
 async function getAllUsers(token: string): Promise<UserData[] | null> {
@@ -120,9 +121,10 @@ async function getAllUsers(token: string): Promise<UserData[] | null> {
     const userData = await users.find().toArray()
 
     return userData.map(data => ({
-        _id: data._id,
+        _id: data._id.toString(),
         username: data.username,
-        email: data.email
+        email: data.email,
+        notifications: data.notifications
     }))
 } 
 
@@ -172,7 +174,7 @@ function validateWebToken(token: string): boolean {
     }
 }
 
-function getUsernameFromToken(): string | null {
+function getUserDataFromToken(): {username: string, _id: string} | null {
     const token = store.get('authToken');
     
     if (!token) {
@@ -181,11 +183,79 @@ function getUsernameFromToken(): string | null {
     
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY as string) as JWTPayload;
-        return decoded.username;
+        return { username: decoded.username, _id: decoded.userId };
     } catch (error: any) {
         console.log(`Failed to extract username from token: ${error.message}`);
         return null;
     }
+}
+
+
+//Notification functions
+async function getNotifications(token: string, _id: string): Promise<NotifiactionType[]> {
+    if (!validateWebToken(token)) {
+        return [];
+    }
+
+    const objId = new ObjectId(_id)
+
+    try {
+        const users = await startQuery('logins');
+        const user = await users.findOne({ _id: objId });
+
+        if (!user) {
+            return [];
+        }
+
+        return user.notifications;
+    } catch (e) {
+        console.log(`Error getting notifications ${e}`)
+        return [];
+    }
+}
+
+async function sendNotification(token: string, _id: string, notification: NotifiactionType): Promise<boolean> {
+    if (!validateWebToken(token)) {
+        return false;
+    }
+
+    return new Promise(async (resolve, reject) => {
+        try {
+            const objId = new ObjectId(_id)
+            const users = await startQuery('logins');
+            const user = await users.findOne({ _id: objId });
+            
+            if (!user) {
+                resolve(false);
+                return;
+            }
+
+            const notifications = [notification, ...user.notifications];
+            users.updateOne({ _id: objId }, { $set: { notifications: notifications } });
+            
+            resolve(true);
+        } catch (e) {
+            reject(`Could not send notification ${e}`)
+        }
+    });
+}
+
+async function markNotificationsAsRead(token: string): Promise<void> {
+    if (!validateWebToken(token)) {
+        return;
+    }
+
+    const user_Id = new ObjectId(getUserDataFromToken()?._id);
+
+    const users = await startQuery('logins');
+    const user = await users.findOne({ _id: user_Id });
+
+    if (!user) {
+        return;
+    }
+
+    const notifications: NotifiactionType[] = user.notifications.map((n: NotifiactionType) => ({ ...n, unread: false }));
+    users.updateOne({ _id: user_Id }, { $set: {notifications: notifications} })
 }
 
 //Modpack functions
@@ -194,9 +264,11 @@ async function createModpack(token: string, modPackInfo: ModpackType): Promise<b
         return false;
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
         try {
-            store.appendToArray('modpacks', modPackInfo)
+            const modpacks = await startQuery('modpacks');
+            const { _id, ...modpackData } = modPackInfo;
+            modpacks.insertOne(modpackData);
             resolve(true)
         } catch {
             reject('Failed to create modpack')
@@ -204,39 +276,42 @@ async function createModpack(token: string, modPackInfo: ModpackType): Promise<b
     })
 }
 
-async function getAllModpacks(token: string): Promise<ModpackType[]> {
+async function getUsersModpacks(token: string): Promise<ModpackType[]> {
     if (!validateWebToken(token)) {
         return [];
     }
 
     try {
-        const modpacks = store.get('modpacks') as ModpackType[] | undefined;
-        return modpacks || [];
+        const modpacks = await startQuery('modpacks');
+        const username = getUserDataFromToken()?.username;
+        const docs = await modpacks.find({ author: username }).toArray()
+
+        return docs.map(doc => ({
+            _id: doc._id.toString(),
+            name: doc.name,
+            description: doc.description,
+            gameID: doc.gameID,
+            author: doc.author,
+            contributers: doc.contributers,
+            mods: doc.mods
+        }))
     } catch (error) {
         console.error('Failed to retrieve modpacks:', error);
         return [];
     }
 }
 
-async function updateModpack(token: string, modpackName: string, updatedModpack: ModpackType): Promise<boolean> {
+async function updateModpack(token: string, _id: string, updatedModpack: ModpackType): Promise<boolean> {
     if (!validateWebToken(token)) {
         return false;
     }
 
     try {
-        const modpacks = store.get('modpacks') as ModpackType[] | undefined;
-        if (!modpacks) {
-            return false;
-        }
-
-        const index = modpacks.findIndex(mp => mp.name === modpackName);
-        if (index === -1) {
-            return false;
-        }
-
-        modpacks[index] = updatedModpack;
-        store.set('modpacks', modpacks);
-        return true;
+        const modpacks = await startQuery('modpacks');
+        const {_id: modpackId, ...updatedModpackData} = updatedModpack;
+        const res = await modpacks.updateOne({ _id: new ObjectId(_id) }, { $set: updatedModpackData })
+        
+        return res.modifiedCount > 0;
     } catch (error) {
         console.error('Failed to update modpack:', error);
         return false;
@@ -244,7 +319,7 @@ async function updateModpack(token: string, modpackName: string, updatedModpack:
 }
 
 //Mod functions
-async function getAllModsForGame(token: string, gameId: number): Promise<Array<{id: string, name: string, author: string}>> {
+async function getAllModsForGame(token: string, gameId: number): Promise<Array<{_id: string, name: string, author: string}>> {
     if (!validateWebToken(token)) {
         return [];
     }
@@ -256,7 +331,7 @@ async function getAllModsForGame(token: string, gameId: number): Promise<Array<{
         const files = await bucket.find({ 'metadata.game': gameId }).toArray();
         
         return files.map(file => ({
-            id: file._id.toString(),
+            _id: file._id.toString(),
             name: file.filename,
             author: file.metadata?.author || 'Unknown'
         }));
@@ -350,8 +425,6 @@ async function getAllGames(token: string): Promise<GameType[]> {
 
     const collection = await startQuery('games');
 
-    console.log(await collection.find().toArray())
-
     const games: GameType[] = (await collection.find().toArray()).map((doc): GameType => {
         return {
             id: doc.id,
@@ -368,4 +441,4 @@ async function getAllGames(token: string): Promise<GameType[]> {
 }
 
 
-export { connectDB, disconnectDB, addUser, getUser, getAllUsers, validateUser, removeUser, validateWebToken, getUsernameFromToken, uploadMod, getAllGames, createModpack, getAllModpacks, updateModpack, getAllModsForGame };
+export { connectDB, disconnectDB, addUser, getUser, getAllUsers, validateUser, removeUser, validateWebToken, getUserDataFromToken, uploadMod, getAllGames, createModpack, getUsersModpacks, updateModpack, getAllModsForGame, getNotifications, sendNotification, markNotificationsAsRead };

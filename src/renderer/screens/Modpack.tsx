@@ -66,9 +66,16 @@ const Modpack: React.FC = () => {
                     return;
                 }
 
-                const currentUsername = await window.db.getUsername();
-                setUsersInModpack(modpack?.contributers)
-                setRegisteredUsers(users.filter(regUser => !usersInModpack.includes(regUser) && regUser.username !== currentUsername));
+                const currUserData = await window.db.getUserDataFromToken();
+                const currUser_Id = currUserData?._id
+                const contributors = modpack.contributers;
+
+                setUsersInModpack(contributors)
+                setRegisteredUsers(
+                    users.filter(
+                        user => user._id && !contributors.some(contrib => contrib._id === user._id) && !(user._id === currUser_Id)
+                    )
+                )
             } catch (error) {
                 console.error('Error fetching users:', error);
             } finally {
@@ -77,7 +84,7 @@ const Modpack: React.FC = () => {
         }
         
         fetchUsers()
-    }, [])
+    }, [modpack, navigate])
 
     const handleAddMod = (modId: string) => {
         if (!currentMods.includes(modId)) {
@@ -86,10 +93,27 @@ const Modpack: React.FC = () => {
     };
 
     const handleRemoveMod = (modId: string) => {
-        setCurrentMods(currentMods.filter(id => id !== modId));
+        setCurrentMods(currentMods.filter(_id => _id !== modId));
     };
 
-    const handleAddUser = (user: UserData) => {
+    const handleAddUser = async (user: UserData) => {
+        const token = await window.db.getAuthToken();
+
+        if (!token || !user._id) {
+            return;
+        }
+
+        const currUserData = await window.db.getUserDataFromToken()
+        const currUsername = currUserData?.username;
+
+        window.db.sendNotification(token, user._id, {
+            id: await window.db.randUUID(),
+            type: 'request',
+            title: 'Contribution Request',
+            message: `${currUsername} would like you to join their modpack ${modpack?.name}`,
+            unread: true
+        })
+
         if (!usersInModpack.includes(user)) {
             setRegisteredUsers([...registeredUsers.filter(regUser => regUser !== user)])
             setUsersInModpack([...usersInModpack, user])
@@ -97,7 +121,8 @@ const Modpack: React.FC = () => {
     }
 
     const handleRemoveUser = (user: UserData) => {
-        setUsersInModpack(usersInModpack.filter(currUser => currUser !== user))
+        setUsersInModpack(usersInModpack.filter(currUser => currUser._id !== user._id));
+        setRegisteredUsers([...registeredUsers, user]);
     }
 
     const handleSave = async () => {
@@ -116,8 +141,8 @@ const Modpack: React.FC = () => {
                 contributers: usersInModpack,
                 mods: currentMods
             };
-
-            const success = await window.db.updateModpack(token, modpack.name, updatedModpack);
+            
+            const success = await window.db.updateModpack(token, modpack._id, updatedModpack);
             
             if (success) {
                 console.log('Modpack updated successfully');
@@ -137,15 +162,15 @@ const Modpack: React.FC = () => {
         return null;
     }
 
-    let currentModObjects: ModType[] = [];
-    let filteredAvailableMods: ModType[] = [];
+    const currentModObjects = availableMods.filter(mod => mod._id && currentMods.includes(mod._id));
 
+    let filteredAvailableMods: ModType[] = [];
     let filteredUsers: UserData[] = [];
 
     if (showAddModsModal) {
-        currentModObjects = availableMods.filter(mod => mod.id && currentMods.includes(mod.id));
-        filteredAvailableMods = availableMods.filter(mod => mod.id && !currentMods.includes(mod.id) && mod.name.toLowerCase().includes(searchQuery.toLowerCase()));
+        filteredAvailableMods = availableMods.filter(mod => mod._id && !currentMods.includes(mod._id) && mod.name.toLowerCase().includes(searchQuery.toLowerCase()));
     } else if (showAddContributorsModal) {
+        console.log(usersInModpack)
         filteredUsers = registeredUsers.filter(user => user.username.toLowerCase().includes(searchQuery.toLowerCase()))
     }
 
@@ -202,11 +227,23 @@ const Modpack: React.FC = () => {
                             <p className="text-gray-300 leading-relaxed">{modpack.description}</p>
                         )}
 
-                        {(modpack.contributers?.length || 0) > 0 && (
+                        {(usersInModpack.length || 0) > 0 && (
                             <div className="mt-4 pt-4 border-t border-purple-500/30">
-                                <span className="text-gray-400 text-sm">
-                                    Contributors: {modpack.contributers?.map(user => user.username).join(', ')}
-                                </span>
+                                <span className="text-gray-400 text-sm font-medium mb-2 block">Contributors:</span>
+                                <div className="flex flex-wrap gap-2">
+                                    {usersInModpack.map(user => (
+                                        <div key={user._id} className="flex items-center bg-purple-900/20 px-3 py-1 rounded-lg text-white text-sm">
+                                            <span>{user.username}</span>
+                                            <button
+                                                className="ml-2 text-gray-400 hover:text-red-400"
+                                                title="Remove contributor"
+                                                onClick={() => handleRemoveUser(user)}
+                                            >
+                                                <FiX size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -253,7 +290,7 @@ const Modpack: React.FC = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
                             {currentModObjects.map((mod) => (
                                 <div 
-                                    key={mod.id}
+                                    key={mod._id}
                                     className="group bg-gray-800/50 border border-gray-700 rounded-lg p-4 hover:border-purple-500/50 transition-all duration-200"
                                 >
                                     <div className="flex items-start justify-between">
@@ -265,7 +302,7 @@ const Modpack: React.FC = () => {
                                             </div>
                                         </div>
                                         <button
-                                            onClick={() => mod.id && handleRemoveMod(mod.id)}
+                                            onClick={() => mod._id && handleRemoveMod(mod._id)}
                                             className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
                                             title="Remove mod"
                                         >
@@ -317,7 +354,7 @@ const Modpack: React.FC = () => {
                                             <div className="space-y-3">
                                                 {filteredAvailableMods.map((mod) => (
                                                     <div 
-                                                        key={mod.id}
+                                                        key={mod._id}
                                                         className="group bg-gray-900/50 border border-gray-700 rounded-lg p-4 hover:border-purple-500/50 transition-all duration-200"
                                                     >
                                                         <div className="flex items-start justify-between">
@@ -329,7 +366,7 @@ const Modpack: React.FC = () => {
                                                                 </div>
                                                             </div>
                                                             <button
-                                                                onClick={() => mod.id && handleAddMod(mod.id)}
+                                                                onClick={() => mod._id && handleAddMod(mod._id)}
                                                                 className="flex items-center space-x-2 px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors text-sm font-medium"
                                                             >
                                                                 <FiPlus size={16} />
@@ -383,7 +420,7 @@ const Modpack: React.FC = () => {
                                             type="text"
                                             value={searchQuery}
                                             onChange={(e) => setSearchQuery(e.target.value)}
-                                            placeholder="Search mods..."
+                                            placeholder="Search people..."
                                             className="w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
                                         />
                                     </div>
@@ -412,6 +449,7 @@ const Modpack: React.FC = () => {
                                                             <button
                                                                 onClick={() => user && handleAddUser(user)}
                                                                 className="flex items-center space-x-2 px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors text-sm font-medium"
+                                                                type="button"
                                                             >
                                                                 <FiPlus size={16} />
                                                                 <span>Add</span>

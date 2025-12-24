@@ -3,8 +3,10 @@ import type { IpcMainInvokeEvent } from 'electron'
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
-import { addUser, connectDB, disconnectDB, validateUser, validateWebToken, getUsernameFromToken, uploadMod, getAllGames, createModpack, getAllModpacks, updateModpack, getAllModsForGame, getAllUsers } from './src/main/database/database';
+import { addUser, connectDB, disconnectDB, validateUser, validateWebToken, uploadMod, getAllGames, createModpack, getUsersModpacks, updateModpack, getAllModsForGame, getAllUsers, getUserDataFromToken, sendNotification, getNotifications, markNotificationsAsRead } from './src/main/database/database';
 import store from './src/main/utils/store'
+import { NotifiactionType } from './src/types/sharedTypes';
+import { randomUUID } from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,8 +36,8 @@ const createIPCHandlers = (): void => {
         return store.get('authToken');
     });
 
-    ipcMain.handle('getUsername', () => {
-        return getUsernameFromToken();
+    ipcMain.handle('getUserDataFromToken', () => {
+        return getUserDataFromToken();
     })
 
     ipcMain.handle('validateAuthToken', (_e: IpcMainInvokeEvent, token: string) => {
@@ -59,16 +61,30 @@ const createIPCHandlers = (): void => {
     });
 
     ipcMain.handle('getAllModpacks', async (_e: IpcMainInvokeEvent, token: string) => {
-        return await getAllModpacks(token);
+        return await getUsersModpacks(token);
     });
 
-    ipcMain.handle('updateModpack', async (_e: IpcMainInvokeEvent, token: string, modpackName: string, updatedModpack: any) => {
-        return await updateModpack(token, modpackName, updatedModpack);
+    ipcMain.handle('updateModpack', async (_e: IpcMainInvokeEvent, token: string, _id: string, updatedModpack: any) => {
+        return await updateModpack(token, _id, updatedModpack);
     });
 
     ipcMain.handle('getAllModsForGame', async (_e: IpcMainInvokeEvent, token: string, gameId: number) => {
         return await getAllModsForGame(token, gameId);
     });
+
+    ipcMain.handle('sendNotification', async (_e: IpcMainInvokeEvent, token: string, _id: string, notification: NotifiactionType) => {
+        return await sendNotification(token, _id, notification);
+    });
+
+    ipcMain.handle('getNotifications', async (_e: IpcMainInvokeEvent, token: string, _id: string) => {
+        return await getNotifications(token, _id);
+    });
+
+    ipcMain.handle('markNotificationsAsRead', async (_e: IpcMainInvokeEvent, token: string) => {
+        return await markNotificationsAsRead(token);
+    });
+
+    ipcMain.handle('randUUID', () => randomUUID().toString()); 
 }
 
 const createWindow = (): void => {
