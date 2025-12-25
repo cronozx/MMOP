@@ -24,14 +24,18 @@ contextBridge.exposeInMainWorld('db', {
     ipcRenderer.invoke('createModpack', token, modpackinfo),
   getAllModpacks: (token: string): Promise<any[]> =>
     ipcRenderer.invoke('getAllModpacks', token),
-  updateModpack: (token: string, _id: string, updatedModpack: any): Promise<boolean> =>
-    ipcRenderer.invoke('updateModpack', token, _id, updatedModpack),
+  updateModpack: (token: string, updatedModpack: any): Promise<boolean> =>
+    ipcRenderer.invoke('updateModpack', token, updatedModpack),
   getAllModsForGame: (token: string, gameId: number): Promise<Array<{_id: string, name: string, author: string}>> =>
     ipcRenderer.invoke('getAllModsForGame', token, gameId),
   sendNotification: (token: string, _id: string, notification: NotifiactionType): Promise<Boolean> => 
     ipcRenderer.invoke('sendNotification', token, _id, notification),
   getNotifications: (token: string, _id: string): Promise<NotifiactionType[]> =>
     ipcRenderer.invoke('getNotifications', token, _id),
+  handleRequestAction: (token: string, modpack_Id: string, accepted: boolean): Promise<void> => 
+    ipcRenderer.invoke('handleRequestAction', token, modpack_Id, accepted),
+  removeNotification: (token: string, notificationId: string): Promise<void> =>
+    ipcRenderer.invoke('removeNotification', token, notificationId),
   markNotificationsAsRead: (token: string): Promise<void> => 
     ipcRenderer.invoke('markNotificationsAsRead', token),
   randUUID: (): Promise<string> => ipcRenderer.invoke('randUUID')

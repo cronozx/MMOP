@@ -214,6 +214,30 @@ async function getNotifications(token: string, _id: string): Promise<Notifiactio
     }
 }
 
+async function removeNotification(token: string, notificationId: string): Promise<void> {
+    if (!validateWebToken(token)) {
+        return;
+    }
+
+    const objId = new ObjectId(getUserDataFromToken()?._id);
+
+    try {
+        const users = await startQuery('logins');
+        const user = await users.findOne({ _id: objId });
+
+        if (!user) {
+            return;
+        }
+
+        let notifications: NotifiactionType[] = user.notifications;
+        notifications = notifications.filter(notification => notification.id !== notificationId);
+        
+        await users.updateOne({ _id: objId }, {$set: { notifications: notifications }})
+    } catch (e) {
+        console.log(`Error deleting notification ${e}`)
+    }
+}
+
 async function sendNotification(token: string, _id: string, notification: NotifiactionType): Promise<boolean> {
     if (!validateWebToken(token)) {
         return false;
@@ -255,7 +279,43 @@ async function markNotificationsAsRead(token: string): Promise<void> {
     }
 
     const notifications: NotifiactionType[] = user.notifications.map((n: NotifiactionType) => ({ ...n, unread: false }));
-    users.updateOne({ _id: user_Id }, { $set: {notifications: notifications} })
+    await users.updateOne({ _id: user_Id }, { $set: {notifications: notifications} })
+}
+
+async function handleRequestAction(token: string, modpack_Id: string, accepted: boolean): Promise<void> {
+    console.log(`[handleRequestAction] Called with token: ${token ? '[REDACTED]' : '[EMPTY]'}, modpack_Id: ${modpack_Id}, accepted: ${accepted}`);
+
+    if (!validateWebToken(token)) {
+        console.log('[handleRequestAction] Invalid token.');
+        return;
+    }
+
+    const user_Id = getUserDataFromToken()?._id;
+    const objId = new ObjectId(modpack_Id);
+    const modpack = await getModpack(objId);
+
+    if (!modpack) {
+        console.log(`[handleRequestAction] Modpack not found for id: ${modpack_Id}`);
+        return;
+    }
+    if (!modpack.contributers) {
+        console.log('[handleRequestAction] Modpack has no contributers object.');
+        return;
+    }
+    if (!user_Id) {
+        console.log('[handleRequestAction] No user_Id found from token.');
+        return;
+    }
+
+    if (accepted) {
+        modpack.contributers[user_Id] = accepted;
+        console.log(`[handleRequestAction] User ${user_Id} accepted. Updating contributers:`, modpack.contributers);
+        await updateModpack(token, modpack);
+    } else {
+        delete modpack.contributers[user_Id];
+        console.log(`[handleRequestAction] User ${user_Id} rejected/removed. Updating contributers:`, modpack.contributers);
+        await updateModpack(token, modpack);
+    }
 }
 
 //Modpack functions
@@ -268,6 +328,12 @@ async function createModpack(token: string, modPackInfo: ModpackType): Promise<b
         try {
             const modpacks = await startQuery('modpacks');
             const { _id, ...modpackData } = modPackInfo;
+
+            if (modpackData.contributers instanceof Map) {
+                modpackData.contributers = Object.fromEntries(
+                    Array.from(modpackData.contributers.entries()).map(([user, value]) => [user._id, value])
+                );
+            }
             modpacks.insertOne(modpackData);
             resolve(true)
         } catch {
@@ -283,34 +349,55 @@ async function getUsersModpacks(token: string): Promise<ModpackType[]> {
 
     try {
         const modpacks = await startQuery('modpacks');
-        const username = getUserDataFromToken()?.username;
-        const docs = await modpacks.find({ author: username }).toArray()
+        const userData = getUserDataFromToken();
+        const username = userData?.username;
+        const userId = userData?._id;
+        const docs = await modpacks.find({
+            $or: [
+                { author: username },
+                { [`contributers.${userId}`]: true }
+            ]
+        }).toArray();
 
-        return docs.map(doc => ({
-            _id: doc._id.toString(),
-            name: doc.name,
-            description: doc.description,
-            gameID: doc.gameID,
-            author: doc.author,
-            contributers: doc.contributers,
-            mods: doc.mods
-        }))
+        const modpacksList = await Promise.all(docs.map(async doc => getModpack(doc._id)));
+        return modpacksList.filter((modpack): modpack is ModpackType => modpack !== null);
     } catch (error) {
         console.error('Failed to retrieve modpacks:', error);
         return [];
     }
 }
 
-async function updateModpack(token: string, _id: string, updatedModpack: ModpackType): Promise<boolean> {
+async function getModpack(_id: ObjectId): Promise<ModpackType | null> {
+    const modpacks = await startQuery('modpacks');
+    const doc = await modpacks.findOne({ _id: _id });
+
+    if (!doc) {
+        return null;
+    }
+
+    const contributers: { [userId: string]: boolean } = Object.fromEntries(Object.entries(doc.contributers));
+
+    return {
+        _id: doc._id.toString(),
+        name: doc.name,
+        description: doc.description,
+        gameID: doc.gameID,
+        author: doc.author,
+        contributers: contributers,
+        mods: doc.mods
+    }
+}
+
+async function updateModpack(token: string, updatedModpack: ModpackType): Promise<boolean> {
     if (!validateWebToken(token)) {
         return false;
     }
 
     try {
         const modpacks = await startQuery('modpacks');
-        const {_id: modpackId, ...updatedModpackData} = updatedModpack;
-        const res = await modpacks.updateOne({ _id: new ObjectId(_id) }, { $set: updatedModpackData })
-        
+        const { _id: modpackId, ...updatedModpackData } = updatedModpack;
+        updatedModpackData.contributers = updatedModpack.contributers;
+        const res = await modpacks.updateOne({ _id: new ObjectId(modpackId) }, { $set: updatedModpackData });
         return res.modifiedCount > 0;
     } catch (error) {
         console.error('Failed to update modpack:', error);
@@ -441,4 +528,4 @@ async function getAllGames(token: string): Promise<GameType[]> {
 }
 
 
-export { connectDB, disconnectDB, addUser, getUser, getAllUsers, validateUser, removeUser, validateWebToken, getUserDataFromToken, uploadMod, getAllGames, createModpack, getUsersModpacks, updateModpack, getAllModsForGame, getNotifications, sendNotification, markNotificationsAsRead };
+export { connectDB, disconnectDB, addUser, getUser, getAllUsers, validateUser, removeUser, validateWebToken, getUserDataFromToken, uploadMod, getAllGames, createModpack, getUsersModpacks, updateModpack, getAllModsForGame, getNotifications, removeNotification, sendNotification, markNotificationsAsRead, handleRequestAction };

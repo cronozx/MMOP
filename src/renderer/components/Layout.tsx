@@ -59,13 +59,15 @@ const Layout: React.FC<LayoutProps> = ({ children, showNavbar = true, showSideba
         getNotifications();
     }, [navigate])
 
-    const handleAccept = (notificationId: string) => {
-        console.log('Accepted notification:', notificationId);
-    };
+    const handleRequest = async (notification: NotifiactionType, action: boolean) => {
+        const token = await window.db.getAuthToken();
+        if (!token || !notification.modpack_Id) {
+            return;
+        }
 
-    const handleDeny = (notificationId: string) => {
-        console.log('Denied notification:', notificationId);
-    };
+        await window.db.handleRequestAction(token, notification.modpack_Id, action);
+        await window.db.removeNotification(token, notification.id);
+    }
 
     const handleRead = async () => {
         const token = await window.db.getAuthToken();
@@ -152,13 +154,13 @@ const Layout: React.FC<LayoutProps> = ({ children, showNavbar = true, showSideba
                                                         {notification.type === 'request' && (
                                                             <div className="flex items-center space-x-2">
                                                                 <button 
-                                                                    onClick={() => handleAccept(notification.id)}
+                                                                    onClick={() => handleRequest(notification, true)}
                                                                     className="flex-1 px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-medium rounded transition-colors duration-200"
                                                                 >
                                                                     Accept
                                                                 </button>
                                                                 <button 
-                                                                    onClick={() => handleDeny(notification.id)}
+                                                                    onClick={() => handleRequest(notification, false)}
                                                                     className="flex-1 px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-medium rounded transition-colors duration-200"
                                                                 >
                                                                     Deny

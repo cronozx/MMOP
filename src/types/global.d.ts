@@ -15,11 +15,13 @@ interface DbAPI {
   getAllGames: (token: string) => Promise<Game[]>;
   createModpack: (token: string, modpackinfo: ModpackType) => Promise<boolean>;
   getAllModpacks: (token: string) => Promise<ModpackType[]>;
-  updateModpack: (token: string, modpackName: string, updatedModpack: ModpackType) => Promise<boolean>;
+  updateModpack: (token: string, updatedModpack: ModpackType) => Promise<boolean>;
   getAllModsForGame: (token: string, gameId: number) => Promise<ModType[]>;
   getNotifications: (token: string, _id: string) => Promise<NotifiactionType[]>;
+  removeNotification: (token: string, notificationId) => Promise<void>;
   sendNotification: (token: string, _id: string, notification: NotifiactionType) => Promise<boolean>;
   markNotificationsAsRead: (token: string) => Promise<void>;
+  handleRequestAction: (token: string, modpack_Id: string, accepted: boolean) => Promise<void>;
   randUUID: () => Promise<string>;
 }
 

@@ -15,9 +15,12 @@ const Modpack: React.FC = () => {
     const [showAddModsModal, setShowAddModsModal] = useState<boolean>(false);
     const [showAddContributorsModal, setShowAddContributorsModal] = useState<boolean>(false);
     const [registeredUsers, setRegisteredUsers] = useState<UserData[]>([]);
-    const [usersInModpack, setUsersInModpack] = useState<UserData[]>([]);
+    const [contributersInModpack, setContributorsInModpack] = useState<UserData[]>([]);
+    const [pendingContributers, setPendingContributers] = useState<UserData[]>([])
     const [searchQuery, setSearchQuery] = useState<string>("");
     const [saving, setSaving] = useState<boolean>(false);
+    const [isContributor, setIsContributor] = useState(false);
+    const [isAuthor, setIsAuthor] = useState(false);
 
     useEffect(() => {
         const fetchMods = async () => {
@@ -55,34 +58,47 @@ const Modpack: React.FC = () => {
                     navigate('/login');
                     return;
                 }
-                
+
                 //Grabs users from db and sets useState
                 const users = await window.db.getAllUsers(token);
                 if (!users) {
                     return;
                 }
-
                 if (!modpack?.contributers) {
                     return;
                 }
 
                 const currUserData = await window.db.getUserDataFromToken();
-                const currUser_Id = currUserData?._id
-                const contributors = modpack.contributers;
+                const currUser_Id = currUserData?._id;
 
-                setUsersInModpack(contributors)
+                if (!currUser_Id) {
+                    throw new Error('Could not get current user id')
+                }
+
+                setIsAuthor(currUserData?.username === modpack.author);
+                setIsContributor(!!modpack.contributers[currUser_Id]);
+
+                const confirmedContributers: UserData[] = users.filter(
+                    user => modpack.contributers && modpack.contributers[user._id]
+                );
+
+                const pendingContributers: UserData[] = users.filter(
+                    user => modpack.contributers && modpack.contributers[user._id] === false
+                );
+
+                setContributorsInModpack(confirmedContributers);
+                setPendingContributers(pendingContributers);
                 setRegisteredUsers(
                     users.filter(
-                        user => user._id && !contributors.some(contrib => contrib._id === user._id) && !(user._id === currUser_Id)
+                        user => user._id && !confirmedContributers.some(contrib => contrib._id === user._id) && !(user._id === currUser_Id)
                     )
-                )
+                );
             } catch (error) {
                 console.error('Error fetching users:', error);
             } finally {
                 setLoading(false);
             }
         }
-        
         fetchUsers()
     }, [modpack, navigate])
 
@@ -103,25 +119,19 @@ const Modpack: React.FC = () => {
             return;
         }
 
-        const currUserData = await window.db.getUserDataFromToken()
-        const currUsername = currUserData?.username;
-
-        window.db.sendNotification(token, user._id, {
-            id: await window.db.randUUID(),
-            type: 'request',
-            title: 'Contribution Request',
-            message: `${currUsername} would like you to join their modpack ${modpack?.name}`,
-            unread: true
-        })
-
-        if (!usersInModpack.includes(user)) {
+        if (!contributersInModpack.includes(user)) {
             setRegisteredUsers([...registeredUsers.filter(regUser => regUser !== user)])
-            setUsersInModpack([...usersInModpack, user])
+            setPendingContributers([...pendingContributers, user])
         }
     }
 
     const handleRemoveUser = (user: UserData) => {
-        setUsersInModpack(usersInModpack.filter(currUser => currUser._id !== user._id));
+        if (contributersInModpack.includes(user)) {
+            setContributorsInModpack(contributersInModpack.filter(currUser => currUser._id !== user._id));
+        } else if (pendingContributers.includes(user)) {
+            setPendingContributers(pendingContributers.filter(currUser => currUser._id !== user._id));
+        }
+
         setRegisteredUsers([...registeredUsers, user]);
     }
 
@@ -129,27 +139,63 @@ const Modpack: React.FC = () => {
         if (!modpack) return;
 
         setSaving(true);
-        try {
-            const token = await window.db.getAuthToken();
-            if (!token) {
-                navigate('/login');
-                return;
-            }
 
-            const updatedModpack: ModpackType = {
-                ...modpack,
-                contributers: usersInModpack,
-                mods: currentMods
-            };
-            
-            const success = await window.db.updateModpack(token, modpack._id, updatedModpack);
-            
-            if (success) {
-                console.log('Modpack updated successfully');
-                setModpack(updatedModpack)
-                setShowAddModsModal(false);
-            } else {
-                console.error('Failed to update modpack');
+        try {
+            if (isAuthor) {
+                const token = await window.db.getAuthToken();
+                if (!token) {
+                    navigate('/login');
+                    return;
+                }
+
+                const allContributers = [...contributersInModpack, ...pendingContributers];
+                const contributersPairs: { [userId: string]: boolean } = {};
+                allContributers.forEach(user => {
+                    if (user._id) {
+                        if (contributersInModpack.includes(user)) {
+                            contributersPairs[user._id] = true;
+                        } else {
+                            contributersPairs[user._id] = false;
+                        }
+                    } 
+                });
+
+                const updatedModpack: ModpackType = {
+                    ...modpack,
+                    contributers: contributersPairs,
+                    mods: currentMods
+                };
+                
+                const success = await window.db.updateModpack(token, updatedModpack);
+                
+                if (success) {
+                    console.log('Modpack updated successfully');
+                    setModpack(updatedModpack)
+
+                    const currUserData = await window.db.getUserDataFromToken()
+                    const currUsername = currUserData?.username;
+
+                    pendingContributers.forEach(async (user) => { 
+                        if (!user._id) {
+                            return;
+                        }
+
+                        window.db.sendNotification(token, user._id, {
+                            id: await window.db.randUUID(),
+                            type: 'request',
+                            title: 'Contribution Request',
+                            message: `${currUsername} would like you to join their modpack ${modpack?.name}`,
+                            unread: true,
+                            modpack_Id: modpack._id
+                        })
+                    });
+
+                    setShowAddModsModal(false);
+                } else {
+                    console.error('Failed to update modpack');
+                }
+            } else if (isContributor) {
+                //Logic will be added next commit :D im so tired
             }
         } catch (error) {
             console.error('Error saving modpack:', error);
@@ -170,11 +216,12 @@ const Modpack: React.FC = () => {
     if (showAddModsModal) {
         filteredAvailableMods = availableMods.filter(mod => mod._id && !currentMods.includes(mod._id) && mod.name.toLowerCase().includes(searchQuery.toLowerCase()));
     } else if (showAddContributorsModal) {
-        console.log(usersInModpack)
         filteredUsers = registeredUsers.filter(user => user.username.toLowerCase().includes(searchQuery.toLowerCase()))
     }
 
-    const hasChanges = JSON.stringify(currentMods) !== JSON.stringify(modpack.mods) || JSON.stringify(usersInModpack) !== JSON.stringify(modpack.contributers);
+    const allContribIds = [...contributersInModpack, ...pendingContributers].map(u => u._id).filter(Boolean).sort();
+    const modpackContribIds = Object.keys(modpack.contributers || {}).sort();
+    const hasChanges = JSON.stringify(currentMods) !== JSON.stringify(modpack.mods) || JSON.stringify(allContribIds) !== JSON.stringify(modpackContribIds);
 
     if (loading) {
         return (
@@ -227,20 +274,36 @@ const Modpack: React.FC = () => {
                             <p className="text-gray-300 leading-relaxed">{modpack.description}</p>
                         )}
 
-                        {(usersInModpack.length || 0) > 0 && (
+                        {(contributersInModpack.length > 0 || pendingContributers.length > 0) && (
                             <div className="mt-4 pt-4 border-t border-purple-500/30">
                                 <span className="text-gray-400 text-sm font-medium mb-2 block">Contributors:</span>
                                 <div className="flex flex-wrap gap-2">
-                                    {usersInModpack.map(user => (
+                                    {contributersInModpack.map(user => (
                                         <div key={user._id} className="flex items-center bg-purple-900/20 px-3 py-1 rounded-lg text-white text-sm">
                                             <span>{user.username}</span>
-                                            <button
-                                                className="ml-2 text-gray-400 hover:text-red-400"
-                                                title="Remove contributor"
-                                                onClick={() => handleRemoveUser(user)}
-                                            >
-                                                <FiX size={16} />
-                                            </button>
+                                            {isAuthor && (
+                                                <button
+                                                    className="ml-2 text-gray-400 hover:text-red-400"
+                                                    title="Remove contributor"
+                                                    onClick={() => handleRemoveUser(user)}
+                                                >
+                                                    <FiX size={16} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {pendingContributers.map(user => (
+                                        <div key={user._id} className="flex items-center bg-yellow-900/20 px-3 py-1 rounded-lg text-yellow-200 text-sm border border-yellow-400/40">
+                                            <span>{user.username} <span className="italic text-yellow-400">(pending)</span></span>
+                                            {isAuthor && (
+                                                <button
+                                                    className="ml-2 text-gray-400 hover:text-red-400"
+                                                    title="Remove pending contributor"
+                                                    onClick={() => handleRemoveUser(user)}
+                                                >
+                                                    <FiX size={16} />
+                                                </button>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -253,22 +316,37 @@ const Modpack: React.FC = () => {
                         <h2 className="text-2xl font-bold text-white">Mods in this Pack</h2>
                         <div className="flex items-center space-x-3">
                             {hasChanges && (
-                                <button
-                                    onClick={handleSave}
-                                    disabled={saving}
-                                    className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-medium"
-                                >
-                                    <FiCheck />
-                                    <span>{saving ? 'Saving...' : 'Save Changes'}</span>
-                                </button>
+                                isAuthor ? (
+                                    <button
+                                        onClick={handleSave}
+                                        disabled={saving}
+                                        className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-medium"
+                                    >
+                                        <FiCheck />
+                                        <span>{saving ? 'Saving...' : 'Save Changes'}</span>
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={handleSave}
+                                        disabled={saving}
+                                        className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-medium"
+                                    >
+                                        <FiCheck />
+                                        <span>{saving ? 'Request Save' : 'Request Save'}</span>
+                                    </button>
+                                )
                             )}
-                            <button
-                                onClick={() => setShowAddContributorsModal(true)}
-                                className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors font-medium"
-                            >
-                                <FiUserPlus />
-                                <span>Add Contributors</span>
-                            </button>
+                            {isAuthor && (
+                                <>
+                                    <button
+                                        onClick={() => setShowAddContributorsModal(true)}
+                                        className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors font-medium"
+                                    >
+                                        <FiUserPlus />
+                                        <span>Add Contributors</span>
+                                    </button>
+                                </>
+                            )}
                             <button
                                 onClick={() => setShowAddModsModal(true)}
                                 className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors font-medium"

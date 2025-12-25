@@ -4,6 +4,7 @@ export interface NotifiactionType {
   title: string;
   message: string;
   unread: boolean;
+  modpack_Id?: string;
 }
 
 export interface ModType {
@@ -35,7 +36,7 @@ export interface ModpackType {
   description: string;
   gameID: number;
   author: string;
-  contributers: UserData[];
+  contributers: { [userId: string]: boolean };
   mods: string[];
 }
 

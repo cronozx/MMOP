@@ -3,7 +3,7 @@ import type { IpcMainInvokeEvent } from 'electron'
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
-import { addUser, connectDB, disconnectDB, validateUser, validateWebToken, uploadMod, getAllGames, createModpack, getUsersModpacks, updateModpack, getAllModsForGame, getAllUsers, getUserDataFromToken, sendNotification, getNotifications, markNotificationsAsRead } from './src/main/database/database';
+import { addUser, connectDB, disconnectDB, validateUser, validateWebToken, uploadMod, getAllGames, createModpack, getUsersModpacks, updateModpack, getAllModsForGame, getAllUsers, getUserDataFromToken, sendNotification, getNotifications, markNotificationsAsRead, handleRequestAction, removeNotification } from './src/main/database/database';
 import store from './src/main/utils/store'
 import { NotifiactionType } from './src/types/sharedTypes';
 import { randomUUID } from 'crypto';
@@ -64,8 +64,9 @@ const createIPCHandlers = (): void => {
         return await getUsersModpacks(token);
     });
 
-    ipcMain.handle('updateModpack', async (_e: IpcMainInvokeEvent, token: string, _id: string, updatedModpack: any) => {
-        return await updateModpack(token, _id, updatedModpack);
+    ipcMain.handle('updateModpack', async (_e: IpcMainInvokeEvent, token: string, updatedModpack: any) => {
+        console.log(updatedModpack.contributers)
+        return await updateModpack(token, updatedModpack);
     });
 
     ipcMain.handle('getAllModsForGame', async (_e: IpcMainInvokeEvent, token: string, gameId: number) => {
@@ -80,8 +81,16 @@ const createIPCHandlers = (): void => {
         return await getNotifications(token, _id);
     });
 
+    ipcMain.handle('removeNotification', async (_e: IpcMainInvokeEvent, token: string, notificationId) => {
+        return await removeNotification(token, notificationId);
+    });
+
     ipcMain.handle('markNotificationsAsRead', async (_e: IpcMainInvokeEvent, token: string) => {
         return await markNotificationsAsRead(token);
+    });
+
+    ipcMain.handle('handleRequestAction', async (_e: IpcMainInvokeEvent, token: string, modpack_Id: string, accepted: boolean) => {
+        return await handleRequestAction(token, modpack_Id, accepted);
     });
 
     ipcMain.handle('randUUID', () => randomUUID().toString()); 
